@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { FaUsers, FaChartLine, FaTrophy, FaArrowDown, FaPlus } from 'react-icons/fa';
+import {
+  FaUsers,
+  FaChartLine,
+  FaTrophy,
+  FaArrowDown,
+  FaPlus,
+  FaBookOpen,
+  FaGraduationCap,
+} from 'react-icons/fa';
 import { fetchDashboard } from '../../api/api';
 
 export default function Dashboard() {
@@ -19,21 +27,29 @@ export default function Dashboard() {
       const response = await fetchDashboard();
       setData(response.data);
     } catch (err) {
-      setError('Failed to load dashboard data. Please make sure the server is reachable.');
+      const msg = err.userMessage || 'Failed to load dashboard metrics from backend server.';
+      setError(msg);
     } finally {
       setLoading(false);
     }
   };
 
   if (loading) {
-    return <div className="loading">Loading dashboard metrics...</div>;
+    return (
+      <div className="loading">
+        <div className="spinner"></div>
+        <p>Loading institutional academic metrics...</p>
+      </div>
+    );
   }
 
   if (error || !data) {
     return (
       <div className="empty-state">
-        <p>{error || 'No dashboard data available'}</p>
-        <button className="btn btn-primary" onClick={loadDashboard}>Retry</button>
+        <p className="error-text">{error || 'No dashboard data available'}</p>
+        <button className="btn btn-primary" onClick={loadDashboard} style={{ marginTop: '1rem' }}>
+          Retry Connection
+        </button>
       </div>
     );
   }
@@ -53,6 +69,8 @@ export default function Dashboard() {
   const lowestPct = data.lowestScorer?.averagePercentage ?? data.lowestScorer?.percentage;
 
   const summaryStudents = data.performanceSummary || data.students || [];
+  const subjectAverages = data.subjectAverages || [];
+  const gradeDistribution = data.gradeDistribution || {};
 
   return (
     <div>
@@ -66,14 +84,14 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      {/* 4 Stat Cards */}
+      {/* 4 Primary Metric Stat Cards */}
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-icon blue">
             <FaUsers />
           </div>
           <div className="stat-info">
-            <span className="stat-label">Total Students</span>
+            <span className="stat-label">Total Enrolled</span>
             <span className="stat-value">{data.totalStudents ?? 0}</span>
           </div>
         </div>
@@ -83,7 +101,7 @@ export default function Dashboard() {
             <FaChartLine />
           </div>
           <div className="stat-info">
-            <span className="stat-label">Average Class Score</span>
+            <span className="stat-label">Class Average</span>
             <span className="stat-value">
               {data.averagePercentage != null ? `${Number(data.averagePercentage).toFixed(1)}%` : 'N/A'}
             </span>
@@ -95,7 +113,7 @@ export default function Dashboard() {
             <FaTrophy />
           </div>
           <div className="stat-info">
-            <span className="stat-label">Highest Score</span>
+            <span className="stat-label">Top Performer</span>
             <span className="stat-value" style={{ fontSize: '1.15rem' }}>
               {highestName || 'N/A'}
             </span>
@@ -110,7 +128,7 @@ export default function Dashboard() {
             <FaArrowDown />
           </div>
           <div className="stat-info">
-            <span className="stat-label">Lowest Score</span>
+            <span className="stat-label">Lowest Scorer</span>
             <span className="stat-value" style={{ fontSize: '1.15rem' }}>
               {lowestName || 'N/A'}
             </span>
@@ -121,7 +139,72 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Student Academic Performance Summary */}
+      {/* Analytics Row: Subject Averages & Grade Distribution */}
+      <div className="analytics-grid">
+        {/* Subject-Wise Averages Card */}
+        <div className="card">
+          <div className="card-header">
+            <h3><FaBookOpen style={{ marginRight: '0.5rem', color: 'var(--primary)' }} /> Subject Performance Averages</h3>
+          </div>
+          <div className="card-body">
+            {subjectAverages.length > 0 ? (
+              <div className="subject-bars-list">
+                {subjectAverages.map((sub) => {
+                  const pct = Math.min(100, Math.max(0, sub.averagePercentage || 0));
+                  return (
+                    <div key={sub.subject} className="subject-bar-item">
+                      <div className="subject-bar-header">
+                        <span className="subject-name">{sub.subject}</span>
+                        <span className="subject-pct">{pct.toFixed(1)}%</span>
+                      </div>
+                      <div className="progress-track">
+                        <div
+                          className="progress-fill"
+                          style={{
+                            width: `${pct}%`,
+                            background: pct >= 80 ? '#10b981' : pct >= 60 ? '#4f46e5' : pct >= 40 ? '#f59e0b' : '#ef4444',
+                          }}
+                        ></div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-muted" style={{ textAlign: 'center', padding: '1rem' }}>
+                No subject examination data recorded yet.
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Grade Distribution Breakdown Card */}
+        <div className="card">
+          <div className="card-header">
+            <h3><FaGraduationCap style={{ marginRight: '0.5rem', color: 'var(--primary)' }} /> Grade Distribution</h3>
+          </div>
+          <div className="card-body">
+            {Object.keys(gradeDistribution).length > 0 ? (
+              <div className="grade-pills-grid">
+                {Object.entries(gradeDistribution).map(([grade, count]) => (
+                  <div key={grade} className="grade-pill-item">
+                    <span className={`badge ${grade.startsWith('A') ? 'badge-a' : grade.startsWith('B') ? 'badge-b' : grade === 'F' ? 'badge-f' : 'badge-c'}`}>
+                      {grade}
+                    </span>
+                    <span className="grade-count">{count} Students</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted" style={{ textAlign: 'center', padding: '1rem' }}>
+                Grade distributions will appear once marks are added.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Student Academic Performance Summary Table */}
       <div className="card" style={{ marginTop: '2rem' }}>
         <div className="card-header">
           <div>
@@ -167,7 +250,7 @@ export default function Dashboard() {
                         </td>
                         <td>{student.className || '—'}</td>
                         <td>
-                          <strong>{avg != null ? `${Number(avg).toFixed(1)}%` : 'No Marks'}</strong>
+                          <strong>{avg != null ? `${Number(avg).toFixed(1)}%` : 'No Records'}</strong>
                         </td>
                         <td>
                           <span className={getGradeBadgeClass(grade)}>{grade}</span>
@@ -185,7 +268,7 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="empty-state">
-              <p>No students found. Add your first student to see academic summaries.</p>
+              <p>No students found. Register your first student to see academic summaries.</p>
               <Link to="/students/new" className="btn btn-primary" style={{ marginTop: '0.5rem' }}>
                 Register Student
               </Link>

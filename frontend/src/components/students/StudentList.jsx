@@ -9,6 +9,8 @@ import {
   FaSortAmountDown,
   FaSortAmountUp,
   FaFilter,
+  FaChevronLeft,
+  FaChevronRight,
 } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { fetchStudents, deleteStudent } from '../../api/api';
@@ -18,6 +20,12 @@ export default function StudentList() {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Pagination states
+  const [page, setPage] = useState(0);
+  const [size] = useState(8);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalElements, setTotalElements] = useState(0);
 
   // Filters and sorting states
   const [search, setSearch] = useState('');
@@ -39,32 +47,56 @@ export default function StudentList() {
         performance: performanceFilter !== 'all' ? performanceFilter : undefined,
         sortBy,
         sortDir,
+        page,
+        size,
       };
+
       const res = await fetchStudents(params);
-      setStudents(res.data);
+      const data = res.data;
+
+      if (Array.isArray(data)) {
+        setStudents(data);
+        setTotalElements(data.length);
+        setTotalPages(Math.ceil(data.length / size) || 1);
+      } else if (data && data.content) {
+        setStudents(data.content);
+        setTotalElements(data.totalElements || 0);
+        setTotalPages(data.totalPages || 1);
+      } else {
+        setStudents([]);
+        setTotalElements(0);
+        setTotalPages(1);
+      }
     } catch (err) {
-      setError(err.response?.data?.error || 'Unable to retrieve students from server');
+      const msg = err.userMessage || err.response?.data?.message || 'Unable to retrieve students from server';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
-  }, [search, selectedClass, performanceFilter, sortBy, sortDir]);
+  }, [search, selectedClass, performanceFilter, sortBy, sortDir, page, size]);
 
   useEffect(() => {
-    // Debounce search slightly
     const timer = setTimeout(() => {
       loadStudents();
-    }, 200);
+    }, 250);
     return () => clearTimeout(timer);
   }, [loadStudents]);
+
+  // Reset to first page when search/filter criteria change
+  useEffect(() => {
+    setPage(0);
+  }, [search, selectedClass, performanceFilter, sortBy, sortDir]);
 
   const handleDeleteConfirm = async () => {
     if (!studentToDelete) return;
     try {
       await deleteStudent(studentToDelete.id);
-      toast.success(`Student ${studentToDelete.fullName || studentToDelete.name} deleted`);
+      toast.success(`Student ${studentToDelete.fullName || studentToDelete.name} deleted successfully`);
       loadStudents();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to delete student');
+      const msg = err.userMessage || err.response?.data?.message || 'Failed to delete student record';
+      toast.error(msg);
     } finally {
       setStudentToDelete(null);
     }
@@ -74,7 +106,6 @@ export default function StudentList() {
     setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
   };
 
-  // Derive distinct classes from loaded list or defaults
   const classOptions = ['all', 'Grade 10 - A', 'Grade 11 - B', 'Grade 12 - Science'];
 
   const getStudentAverage = (s) => {
@@ -85,10 +116,14 @@ export default function StudentList() {
   };
 
   const getGradeBadge = (percentage) => {
-    if (percentage == null) return <span className="badge badge-neutral">No Marks</span>;
-    if (percentage >= 80) return <span className="badge badge-a">Distinction ({percentage.toFixed(0)}%)</span>;
-    if (percentage >= 50) return <span className="badge badge-b">Pass ({percentage.toFixed(0)}%)</span>;
-    return <span className="badge badge-f">Needs Help ({percentage.toFixed(0)}%)</span>;
+    if (percentage == null) return <span className="badge badge-neutral">No Records</span>;
+    if (percentage >= 90) return <span className="badge badge-a">A+ ({percentage.toFixed(1)}%)</span>;
+    if (percentage >= 80) return <span className="badge badge-a">A ({percentage.toFixed(1)}%)</span>;
+    if (percentage >= 70) return <span className="badge badge-b">B+ ({percentage.toFixed(1)}%)</span>;
+    if (percentage >= 60) return <span className="badge badge-b">B ({percentage.toFixed(1)}%)</span>;
+    if (percentage >= 50) return <span className="badge badge-c">C ({percentage.toFixed(1)}%)</span>;
+    if (percentage >= 40) return <span className="badge badge-c">D ({percentage.toFixed(1)}%)</span>;
+    return <span className="badge badge-f">F ({percentage.toFixed(1)}%)</span>;
   };
 
   return (
@@ -96,7 +131,7 @@ export default function StudentList() {
       <div className="page-header">
         <div>
           <h1>Student Directory</h1>
-          <p className="text-muted">Manage all enrolled students, contact info, and examination records</p>
+          <p className="text-muted">Manage enrolled students, contact info, and examination records</p>
         </div>
         <Link to="/students/new" className="btn btn-primary">
           <FaPlus /> Register Student
@@ -112,7 +147,7 @@ export default function StudentList() {
               <FaSearch className="search-icon" />
               <input
                 type="text"
-                placeholder="Search by student name or ID..."
+                placeholder="Search by name, ID, or email..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="search-input"
@@ -142,9 +177,9 @@ export default function StudentList() {
                 value={performanceFilter}
                 onChange={(e) => setPerformanceFilter(e.target.value)}
               >
-                <option value="all">All Performance</option>
+                <option value="all">All Tiers</option>
                 <option value="distinction">Distinction (≥75%)</option>
-                <option value="average">Average (40–74%)</option>
+                <option value="average">Average (40–74.9%)</option>
                 <option value="low">Needs Help (&lt;40%)</option>
               </select>
             </div>
@@ -159,6 +194,7 @@ export default function StudentList() {
               >
                 <option value="name">Name</option>
                 <option value="studentId">Student ID</option>
+                <option value="email">Email</option>
                 <option value="percentage">Marks / %</option>
               </select>
               <button
@@ -178,84 +214,131 @@ export default function StudentList() {
       {/* Students Data Table */}
       <div className="card">
         <div className="card-header">
-          <h2>Registered Students ({students.length})</h2>
+          <h2>Registered Students ({totalElements})</h2>
+          {totalElements > 0 && (
+            <span className="text-muted" style={{ fontSize: '0.85rem' }}>
+              Showing {students.length} of {totalElements}
+            </span>
+          )}
         </div>
 
         <div className="card-body">
           {loading ? (
-            <div className="loading">Loading student records...</div>
+            <div className="loading">
+              <div className="spinner"></div>
+              <p>Loading student records...</p>
+            </div>
           ) : error ? (
             <div className="empty-state">
-              <p>{error}</p>
-              <button type="button" className="btn btn-primary" onClick={loadStudents}>
-                Retry
+              <p className="error-text">{error}</p>
+              <button type="button" className="btn btn-primary" onClick={loadStudents} style={{ marginTop: '0.75rem' }}>
+                Retry Connection
               </button>
             </div>
           ) : students.length > 0 ? (
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Student ID</th>
-                    <th>Full Name</th>
-                    <th>Class / Dept</th>
-                    <th>Email Address</th>
-                    <th>Phone</th>
-                    <th>Performance</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {students.map((s) => {
-                    const avg = getStudentAverage(s);
-                    return (
-                      <tr key={s.id}>
-                        <td>
-                          <span className="badge badge-neutral">
-                            {s.studentId}
-                          </span>
-                        </td>
-                        <td>
-                          <Link to={`/students/${s.id}`} className="student-name-link">
-                            <strong>{s.fullName || s.name}</strong>
-                          </Link>
-                        </td>
-                        <td>{s.className || '—'}</td>
-                        <td>{s.email || '—'}</td>
-                        <td>{s.phone || '—'}</td>
-                        <td>{getGradeBadge(avg)}</td>
-                        <td>
-                          <div className="action-buttons">
-                            <Link
-                              to={`/students/${s.id}`}
-                              className="btn-icon"
-                              title="View Profile & Marks"
-                            >
-                              <FaEye />
+            <>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Student ID</th>
+                      <th>Full Name</th>
+                      <th>Class / Dept</th>
+                      <th>Email Address</th>
+                      <th>Phone</th>
+                      <th>Performance</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {students.map((s) => {
+                      const avg = getStudentAverage(s);
+                      return (
+                        <tr key={s.id}>
+                          <td>
+                            <span className="badge badge-neutral">
+                              {s.studentId}
+                            </span>
+                          </td>
+                          <td>
+                            <Link to={`/students/${s.id}`} className="student-name-link">
+                              <strong>{s.fullName || s.name}</strong>
                             </Link>
-                            <Link
-                              to={`/students/edit/${s.id}`}
-                              className="btn-icon"
-                              title="Edit Details"
-                            >
-                              <FaEdit />
-                            </Link>
-                            <button
-                              type="button"
-                              className="btn-icon danger"
-                              title="Delete Record"
-                              onClick={() => setStudentToDelete(s)}
-                            >
-                              <FaTrash />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          </td>
+                          <td>{s.className || '—'}</td>
+                          <td>{s.email || '—'}</td>
+                          <td>{s.phone || '—'}</td>
+                          <td>{getGradeBadge(avg)}</td>
+                          <td>
+                            <div className="action-buttons">
+                              <Link
+                                to={`/students/${s.id}`}
+                                className="btn-icon"
+                                title="View Profile & Marks"
+                              >
+                                <FaEye />
+                              </Link>
+                              <Link
+                                to={`/students/edit/${s.id}`}
+                                className="btn-icon"
+                                title="Edit Details"
+                              >
+                                <FaEdit />
+                              </Link>
+                              <button
+                                type="button"
+                                className="btn-icon danger"
+                                title="Delete Record"
+                                onClick={() => setStudentToDelete(s)}
+                              >
+                                <FaTrash />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Backend Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="pagination-bar">
+                  <span className="pagination-info">
+                    Page {page + 1} of {totalPages}
+                  </span>
+                  <div className="pagination-actions">
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      disabled={page === 0}
+                      onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    >
+                      <FaChevronLeft /> Previous
+                    </button>
+                    {Array.from({ length: totalPages }, (_, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        className={`pagination-number-btn ${i === page ? 'active' : ''}`}
+                        onClick={() => setPage(i)}
+                      >
+                        {i + 1}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      disabled={page >= totalPages - 1}
+                      onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                    >
+                      Next <FaChevronRight />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
             <div className="empty-state">
               <h3>No Students Found</h3>

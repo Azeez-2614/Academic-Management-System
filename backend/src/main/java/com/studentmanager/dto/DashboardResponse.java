@@ -1,12 +1,15 @@
 package com.studentmanager.dto;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
+import java.util.Map;
 
 @Data
+@Builder
 @AllArgsConstructor
 @NoArgsConstructor
 public class DashboardResponse {
@@ -15,6 +18,8 @@ public class DashboardResponse {
     private Double averagePercentage;
     private TopStudent highestScorer;
     private TopStudent lowestScorer;
+    private List<SubjectAverage> subjectAverages;
+    private Map<String, Long> gradeDistribution;
     private List<StudentSummary> performanceSummary;
 
     @Data
@@ -24,6 +29,15 @@ public class DashboardResponse {
         private String studentId;
         private String fullName;
         private Double averagePercentage;
+    }
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class SubjectAverage {
+        private String subject;
+        private Double averagePercentage;
+        private Long totalEntries;
     }
 
     @Data

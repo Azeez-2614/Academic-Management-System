@@ -44,7 +44,7 @@ export default function StudentForm() {
         enrollmentDate: data.enrollmentDate || '',
       });
     } catch (err) {
-      toast.error('Failed to load student details for editing');
+      toast.error(err.userMessage || 'Failed to load student details for editing');
       navigate('/students');
     } finally {
       setLoading(false);
@@ -53,15 +53,43 @@ export default function StudentForm() {
 
   const validate = () => {
     const errs = {};
-    if (!form.studentId.trim()) {
-      errs.studentId = 'Student ID is required (e.g. STU101)';
+    const idVal = form.studentId.trim();
+    if (!idVal) {
+      errs.studentId = 'Student ID is required';
+    } else if (idVal.length < 3 || idVal.length > 20) {
+      errs.studentId = 'Student ID must be between 3 and 20 characters';
+    } else if (!/^[A-Za-z0-9_-]+$/.test(idVal)) {
+      errs.studentId = 'Student ID may only contain letters, numbers, hyphens, and underscores';
     }
-    if (!form.fullName.trim()) {
+
+    const nameVal = form.fullName.trim();
+    if (!nameVal) {
       errs.fullName = 'Full Name is required';
+    } else if (nameVal.length < 2 || nameVal.length > 100) {
+      errs.fullName = 'Full Name must be between 2 and 100 characters';
     }
-    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+
+    const emailVal = form.email.trim();
+    if (!emailVal) {
+      errs.email = 'Email address is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
       errs.email = 'Please provide a valid email address';
     }
+
+    if (form.phone && form.phone.trim()) {
+      if (!/^(\+?[0-9]{1,4}[ -]?)?[0-9]{7,15}$/.test(form.phone.trim())) {
+        errs.phone = 'Phone number must be a valid format (e.g. +1 555-0101)';
+      }
+    }
+
+    if (form.dateOfBirth) {
+      const dob = new Date(form.dateOfBirth);
+      const now = new Date();
+      if (dob >= now) {
+        errs.dateOfBirth = 'Date of birth must be a past date';
+      }
+    }
+
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -76,7 +104,10 @@ export default function StudentForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validate()) return;
+    if (!validate()) {
+      toast.warn('Please resolve validation errors before saving');
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -84,8 +115,8 @@ export default function StudentForm() {
         studentId: form.studentId.trim(),
         fullName: form.fullName.trim(),
         email: form.email.trim(),
-        phone: form.phone.trim(),
-        className: form.className.trim(),
+        phone: form.phone.trim() || null,
+        className: form.className.trim() || null,
         dateOfBirth: form.dateOfBirth || null,
         enrollmentDate: form.enrollmentDate || null,
       };
@@ -99,7 +130,18 @@ export default function StudentForm() {
       }
       navigate('/students');
     } catch (err) {
-      const msg = err.response?.data?.error || err.message || 'Error saving student record';
+      const backendErrors = err.response?.data?.errors;
+      if (backendErrors && Array.isArray(backendErrors)) {
+        const mappedErrors = {};
+        backendErrors.forEach((errMsg) => {
+          if (errMsg.includes('studentId')) mappedErrors.studentId = errMsg;
+          else if (errMsg.includes('fullName')) mappedErrors.fullName = errMsg;
+          else if (errMsg.includes('email')) mappedErrors.email = errMsg;
+          else if (errMsg.includes('phone')) mappedErrors.phone = errMsg;
+        });
+        setErrors(mappedErrors);
+      }
+      const msg = err.userMessage || err.response?.data?.message || 'Error saving student record';
       toast.error(msg);
     } finally {
       setSubmitting(false);
@@ -137,6 +179,7 @@ export default function StudentForm() {
                   onChange={handleChange}
                   placeholder="e.g. STU101"
                   className={errors.studentId ? 'input-error' : ''}
+                  disabled={submitting}
                 />
                 {errors.studentId && <span className="field-error">{errors.studentId}</span>}
               </div>
@@ -151,25 +194,14 @@ export default function StudentForm() {
                   onChange={handleChange}
                   placeholder="e.g. Aarav Sharma"
                   className={errors.fullName ? 'input-error' : ''}
+                  disabled={submitting}
                 />
                 {errors.fullName && <span className="field-error">{errors.fullName}</span>}
               </div>
 
-              {/* Class / Department */}
-              <div className="form-group">
-                <label htmlFor="className">Class / Department</label>
-                <input
-                  id="className"
-                  name="className"
-                  value={form.className}
-                  onChange={handleChange}
-                  placeholder="e.g. Grade 10 - A or Computer Science"
-                />
-              </div>
-
               {/* Email */}
               <div className="form-group">
-                <label htmlFor="email">Email Address</label>
+                <label htmlFor="email">Email Address *</label>
                 <input
                   id="email"
                   name="email"
@@ -178,6 +210,7 @@ export default function StudentForm() {
                   onChange={handleChange}
                   placeholder="e.g. student@school.edu"
                   className={errors.email ? 'input-error' : ''}
+                  disabled={submitting}
                 />
                 {errors.email && <span className="field-error">{errors.email}</span>}
               </div>
@@ -192,6 +225,22 @@ export default function StudentForm() {
                   value={form.phone}
                   onChange={handleChange}
                   placeholder="e.g. +1 555-0101"
+                  className={errors.phone ? 'input-error' : ''}
+                  disabled={submitting}
+                />
+                {errors.phone && <span className="field-error">{errors.phone}</span>}
+              </div>
+
+              {/* Class / Department */}
+              <div className="form-group">
+                <label htmlFor="className">Class / Department</label>
+                <input
+                  id="className"
+                  name="className"
+                  value={form.className}
+                  onChange={handleChange}
+                  placeholder="e.g. Grade 10 - A"
+                  disabled={submitting}
                 />
               </div>
 
@@ -204,7 +253,10 @@ export default function StudentForm() {
                   type="date"
                   value={form.dateOfBirth}
                   onChange={handleChange}
+                  className={errors.dateOfBirth ? 'input-error' : ''}
+                  disabled={submitting}
                 />
+                {errors.dateOfBirth && <span className="field-error">{errors.dateOfBirth}</span>}
               </div>
 
               {/* Enrollment Date */}
@@ -216,6 +268,7 @@ export default function StudentForm() {
                   type="date"
                   value={form.enrollmentDate}
                   onChange={handleChange}
+                  disabled={submitting}
                 />
               </div>
 

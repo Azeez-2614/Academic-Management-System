@@ -2,9 +2,12 @@ package com.studentmanager.service;
 
 import com.studentmanager.entity.Mark;
 import com.studentmanager.entity.Student;
+import com.studentmanager.exception.DuplicateResourceException;
+import com.studentmanager.exception.ResourceNotFoundException;
 import com.studentmanager.repository.MarkRepository;
 import com.studentmanager.repository.StudentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,59 +30,65 @@ public class StudentService {
         return studentRepository.findAll();
     }
 
-    public Optional<Student> getStudentById(Long id) {
-        return studentRepository.findById(id);
+    public Student getStudentById(Long id) {
+        return studentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Student", "id", id));
     }
 
-    public Optional<Student> getStudentByStudentId(String studentId) {
-        return studentRepository.findByStudentId(studentId);
+    public Student getStudentByStudentId(String studentId) {
+        return studentRepository.findByStudentId(studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Student", "studentId", studentId));
     }
 
-    public List<Student> searchStudents(String query) {
-        if (query == null || query.trim().isEmpty()) {
-            return studentRepository.findAll();
-        }
-        String q = query.trim();
-        // Check exact match on student ID first
-        Optional<Student> exactStudent = studentRepository.findByStudentId(q);
-        if (exactStudent.isPresent()) {
-            return List.of(exactStudent.get());
-        }
-        // Otherwise search by full name
-        return studentRepository.findByFullNameContainingIgnoreCase(q);
+    public List<String> getAllClassNames() {
+        return studentRepository.findDistinctClassNames();
     }
 
-    public List<Student> getStudentsByClass(String className) {
-        return studentRepository.findByClassName(className);
-    }
+    /**
+     * Retrieves a page of students with integrated search, class filtering,
+     * academic performance tier filtering, and dynamic multi-column sorting.
+     */
+    public Page<Student> getFilteredAndSortedStudents(
+            String search,
+            String className,
+            String performance,
+            String sortBy,
+            String sortDir,
+            int page,
+            int size) {
 
-    public List<Student> getFilteredAndSortedStudents(String search, String className, String performance, String sortBy, String sortDir) {
-        List<Student> list = studentRepository.findAll();
+        // Validate page and size parameters
+        int pageNumber = Math.max(0, page);
+        int pageSize = Math.max(1, Math.min(100, size));
 
-        // 1. Search filter (by name or studentId)
+        // Fetch students with search & class filters applied via DB query
+        List<Student> allMatches = studentRepository.findAllWithMarks();
+
+        // 1. Search filter (name, studentId, or email)
         if (search != null && !search.trim().isEmpty()) {
             String q = search.trim().toLowerCase();
-            list = list.stream()
+            allMatches = allMatches.stream()
                     .filter(s -> (s.getFullName() != null && s.getFullName().toLowerCase().contains(q)) ||
-                                 (s.getStudentId() != null && s.getStudentId().toLowerCase().contains(q)))
+                                 (s.getStudentId() != null && s.getStudentId().toLowerCase().contains(q)) ||
+                                 (s.getEmail() != null && s.getEmail().toLowerCase().contains(q)))
                     .collect(Collectors.toList());
         }
 
         // 2. Class filter
         if (className != null && !className.trim().isEmpty() && !className.equalsIgnoreCase("all")) {
-            list = list.stream()
+            allMatches = allMatches.stream()
                     .filter(s -> s.getClassName() != null && s.getClassName().equalsIgnoreCase(className.trim()))
                     .collect(Collectors.toList());
         }
 
-        // 3. Academic performance filter (e.g. "top" >= 75%, "average" 40-74%, "low" < 40%)
+        // 3. Performance filter (Distinction >=75%, Average 40-74.99%, Low/Needs Help <40%)
         if (performance != null && !performance.trim().isEmpty() && !performance.equalsIgnoreCase("all")) {
-            list = list.stream().filter(s -> {
+            allMatches = allMatches.stream().filter(s -> {
                 double avg = calculateAveragePercentage(s);
                 return switch (performance.toLowerCase()) {
                     case "distinction", "high", "top" -> avg >= 75.0;
                     case "average", "medium" -> avg >= 40.0 && avg < 75.0;
-                    case "below-average", "low", "fail" -> avg < 40.0 && avg > 0.0;
+                    case "low", "fail", "needs-help" -> avg < 40.0 && avg > 0.0;
                     default -> true;
                 };
             }).collect(Collectors.toList());
@@ -93,14 +102,22 @@ public class StudentService {
                         s -> s.getFullName() == null ? "" : s.getFullName().toLowerCase());
                 case "studentid" -> Comparator.comparing(
                         s -> s.getStudentId() == null ? "" : s.getStudentId().toLowerCase());
+                case "email" -> Comparator.comparing(
+                        s -> s.getEmail() == null ? "" : s.getEmail().toLowerCase());
                 case "percentage", "marks" -> Comparator.comparingDouble(this::calculateAveragePercentage);
                 default -> Comparator.comparing(Student::getId);
             };
 
-            list.sort(isAsc ? comparator : comparator.reversed());
+            allMatches.sort(isAsc ? comparator : comparator.reversed());
         }
 
-        return list;
+        // 5. In-memory pagination of filtered results
+        int start = Math.min(pageNumber * pageSize, allMatches.size());
+        int end = Math.min((pageNumber + 1) * pageSize, allMatches.size());
+        List<Student> pageContent = allMatches.subList(start, end);
+
+        Pageable pageable = PageRequest.of(pageNumber, pageSize);
+        return new PageImpl<>(pageContent, pageable, allMatches.size());
     }
 
     public double calculateAveragePercentage(Student student) {
@@ -121,11 +138,14 @@ public class StudentService {
 
     @Transactional
     public Student createStudent(Student student) {
-        if (student.getStudentId() == null || student.getStudentId().trim().isEmpty()) {
-            throw new IllegalArgumentException("Student ID is required");
-        }
+        // Enforce uniqueness constraints
         if (studentRepository.existsByStudentId(student.getStudentId())) {
-            throw new IllegalArgumentException("Student with ID " + student.getStudentId() + " already exists");
+            throw new DuplicateResourceException(
+                    "Student ID '" + student.getStudentId() + "' is already in use by another student");
+        }
+        if (studentRepository.existsByEmail(student.getEmail())) {
+            throw new DuplicateResourceException(
+                    "Email address '" + student.getEmail() + "' is already registered to another student");
         }
         return studentRepository.save(student);
     }
@@ -133,18 +153,26 @@ public class StudentService {
     @Transactional
     public Student updateStudent(Long id, Student updated) {
         Student existing = studentRepository.findById(id)
-                .orElseThrow(() -> new NoSuchElementException("Student not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Student", "id", id));
 
-        // If studentId changed, ensure it's not duplicate
-        if (updated.getStudentId() != null && !updated.getStudentId().equals(existing.getStudentId())) {
-            if (studentRepository.existsByStudentId(updated.getStudentId())) {
-                throw new IllegalArgumentException("Student ID " + updated.getStudentId() + " is already in use");
+        // Enforce uniqueness constraints on update
+        if (updated.getStudentId() != null && !updated.getStudentId().equalsIgnoreCase(existing.getStudentId())) {
+            if (studentRepository.existsByStudentIdAndIdNot(updated.getStudentId(), id)) {
+                throw new DuplicateResourceException(
+                        "Student ID '" + updated.getStudentId() + "' is already in use by another student");
             }
             existing.setStudentId(updated.getStudentId());
         }
 
+        if (updated.getEmail() != null && !updated.getEmail().equalsIgnoreCase(existing.getEmail())) {
+            if (studentRepository.existsByEmailAndIdNot(updated.getEmail(), id)) {
+                throw new DuplicateResourceException(
+                        "Email address '" + updated.getEmail() + "' is already registered to another student");
+            }
+            existing.setEmail(updated.getEmail());
+        }
+
         if (updated.getFullName() != null) existing.setFullName(updated.getFullName());
-        existing.setEmail(updated.getEmail());
         existing.setPhone(updated.getPhone());
         existing.setClassName(updated.getClassName());
         existing.setDateOfBirth(updated.getDateOfBirth());
@@ -156,8 +184,9 @@ public class StudentService {
     @Transactional
     public void deleteStudent(Long id) {
         if (!studentRepository.existsById(id)) {
-            throw new NoSuchElementException("Student not found with id: " + id);
+            throw new ResourceNotFoundException("Student", "id", id);
         }
         studentRepository.deleteById(id);
     }
+
 }
