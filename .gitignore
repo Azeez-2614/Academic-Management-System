@@ -1,0 +1,22 @@
+# Java / Maven
+backend/target/
+*.class
+
+# React / Node
+frontend/node_modules/
+frontend/dist/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+
+# Mac
+.DS_Store
+
+# Logs
+*.log
