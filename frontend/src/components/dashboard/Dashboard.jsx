@@ -1,14 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  FaUsers,
-  FaChartLine,
-  FaTrophy,
-  FaArrowDown,
-  FaPlus,
-  FaBookOpen,
-  FaGraduationCap,
-} from 'react-icons/fa';
+import { FaUsers, FaChartLine, FaTrophy, FaArrowDown, FaPlus } from 'react-icons/fa';
 import { fetchDashboard } from '../../api/api';
 
 export default function Dashboard() {
@@ -27,8 +19,7 @@ export default function Dashboard() {
       const response = await fetchDashboard();
       setData(response.data);
     } catch (err) {
-      const msg = err.userMessage || 'Failed to load dashboard metrics from backend server.';
-      setError(msg);
+      setError('Unable to connect to the backend server. Make sure Spring Boot is running on port 8080.');
     } finally {
       setLoading(false);
     }
@@ -38,7 +29,7 @@ export default function Dashboard() {
     return (
       <div className="loading">
         <div className="spinner"></div>
-        <p>Loading institutional academic metrics...</p>
+        <p>Loading dashboard metrics...</p>
       </div>
     );
   }
@@ -46,53 +37,51 @@ export default function Dashboard() {
   if (error || !data) {
     return (
       <div className="empty-state">
-        <p className="error-text">{error || 'No dashboard data available'}</p>
-        <button className="btn btn-primary" onClick={loadDashboard} style={{ marginTop: '1rem' }}>
-          Retry Connection
+        <p className="error-text">{error || 'No dashboard data available.'}</p>
+        <button type="button" className="btn btn-primary" onClick={loadDashboard} style={{ marginTop: '1rem' }}>
+          Retry
         </button>
       </div>
     );
   }
 
-  const getGradeBadgeClass = (grade) => {
-    if (!grade || grade === 'N/A') return 'badge badge-neutral';
-    if (grade.startsWith('A')) return 'badge badge-a';
-    if (grade.startsWith('B')) return 'badge badge-b';
-    if (grade.startsWith('C') || grade.startsWith('D')) return 'badge badge-c';
-    return 'badge badge-f';
+  const getGradeBadge = (grade) => {
+    if (!grade || grade === 'N/A') return <span className="badge badge-neutral">No Marks</span>;
+    if (grade.startsWith('A')) return <span className="badge badge-a">{grade}</span>;
+    if (grade.startsWith('B')) return <span className="badge badge-b">{grade}</span>;
+    if (grade.startsWith('C') || grade.startsWith('D')) return <span className="badge badge-c">{grade}</span>;
+    return <span className="badge badge-f">{grade}</span>;
   };
 
-  const highestName = data.highestScorer?.fullName || data.highestScorer?.name;
-  const highestPct = data.highestScorer?.averagePercentage ?? data.highestScorer?.percentage;
+  const highestName = data.highestScorer?.fullName;
+  const highestScore = data.highestScorer?.averagePercentage;
 
-  const lowestName = data.lowestScorer?.fullName || data.lowestScorer?.name;
-  const lowestPct = data.lowestScorer?.averagePercentage ?? data.lowestScorer?.percentage;
+  const lowestName = data.lowestScorer?.fullName;
+  const lowestScore = data.lowestScorer?.averagePercentage;
 
-  const summaryStudents = data.performanceSummary || data.students || [];
-  const subjectAverages = data.subjectAverages || [];
-  const gradeDistribution = data.gradeDistribution || {};
+  const studentSummaries = data.performanceSummary || [];
 
   return (
     <div>
       <div className="page-header">
         <div>
           <h1>Teacher Dashboard</h1>
-          <p className="text-muted">Academic performance overview, batch analytics, and student records</p>
+          <p className="text-muted">Overview of student performance and examination results</p>
         </div>
         <Link to="/students/new" className="btn btn-primary">
-          <FaPlus /> Register Student
+          <FaPlus /> Add Student
         </Link>
       </div>
 
-      {/* 4 Primary Metric Stat Cards */}
+      {/* 4 Stat Cards */}
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-icon blue">
             <FaUsers />
           </div>
           <div className="stat-info">
-            <span className="stat-label">Total Enrolled</span>
-            <span className="stat-value">{data.totalStudents ?? 0}</span>
+            <span className="stat-label">Total Students</span>
+            <span className="stat-value">{data.totalStudents || 0}</span>
           </div>
         </div>
 
@@ -101,7 +90,7 @@ export default function Dashboard() {
             <FaChartLine />
           </div>
           <div className="stat-info">
-            <span className="stat-label">Class Average</span>
+            <span className="stat-label">Average Marks</span>
             <span className="stat-value">
               {data.averagePercentage != null ? `${Number(data.averagePercentage).toFixed(1)}%` : 'N/A'}
             </span>
@@ -113,12 +102,12 @@ export default function Dashboard() {
             <FaTrophy />
           </div>
           <div className="stat-info">
-            <span className="stat-label">Top Performer</span>
-            <span className="stat-value" style={{ fontSize: '1.15rem' }}>
+            <span className="stat-label">Highest Score</span>
+            <span className="stat-value" style={{ fontSize: '1.2rem' }}>
               {highestName || 'N/A'}
             </span>
-            {highestPct != null && (
-              <span className="stat-sub">{Number(highestPct).toFixed(1)}%</span>
+            {highestScore != null && (
+              <span className="stat-sub">{Number(highestScore).toFixed(1)}%</span>
             )}
           </div>
         </div>
@@ -128,149 +117,71 @@ export default function Dashboard() {
             <FaArrowDown />
           </div>
           <div className="stat-info">
-            <span className="stat-label">Lowest Scorer</span>
-            <span className="stat-value" style={{ fontSize: '1.15rem' }}>
+            <span className="stat-label">Lowest Score</span>
+            <span className="stat-value" style={{ fontSize: '1.2rem' }}>
               {lowestName || 'N/A'}
             </span>
-            {lowestPct != null && (
-              <span className="stat-sub">{Number(lowestPct).toFixed(1)}%</span>
+            {lowestScore != null && (
+              <span className="stat-sub">{Number(lowestScore).toFixed(1)}%</span>
             )}
           </div>
         </div>
       </div>
 
-      {/* Analytics Row: Subject Averages & Grade Distribution */}
-      <div className="analytics-grid">
-        {/* Subject-Wise Averages Card */}
-        <div className="card">
-          <div className="card-header">
-            <h3><FaBookOpen style={{ marginRight: '0.5rem', color: 'var(--primary)' }} /> Subject Performance Averages</h3>
-          </div>
-          <div className="card-body">
-            {subjectAverages.length > 0 ? (
-              <div className="subject-bars-list">
-                {subjectAverages.map((sub) => {
-                  const pct = Math.min(100, Math.max(0, sub.averagePercentage || 0));
-                  return (
-                    <div key={sub.subject} className="subject-bar-item">
-                      <div className="subject-bar-header">
-                        <span className="subject-name">{sub.subject}</span>
-                        <span className="subject-pct">{pct.toFixed(1)}%</span>
-                      </div>
-                      <div className="progress-track">
-                        <div
-                          className="progress-fill"
-                          style={{
-                            width: `${pct}%`,
-                            background: pct >= 80 ? '#10b981' : pct >= 60 ? '#4f46e5' : pct >= 40 ? '#f59e0b' : '#ef4444',
-                          }}
-                        ></div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-muted" style={{ textAlign: 'center', padding: '1rem' }}>
-                No subject examination data recorded yet.
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Grade Distribution Breakdown Card */}
-        <div className="card">
-          <div className="card-header">
-            <h3><FaGraduationCap style={{ marginRight: '0.5rem', color: 'var(--primary)' }} /> Grade Distribution</h3>
-          </div>
-          <div className="card-body">
-            {Object.keys(gradeDistribution).length > 0 ? (
-              <div className="grade-pills-grid">
-                {Object.entries(gradeDistribution).map(([grade, count]) => (
-                  <div key={grade} className="grade-pill-item">
-                    <span className={`badge ${grade.startsWith('A') ? 'badge-a' : grade.startsWith('B') ? 'badge-b' : grade === 'F' ? 'badge-f' : 'badge-c'}`}>
-                      {grade}
-                    </span>
-                    <span className="grade-count">{count} Students</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted" style={{ textAlign: 'center', padding: '1rem' }}>
-                Grade distributions will appear once marks are added.
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Student Academic Performance Summary Table */}
+      {/* Student Performance Summary Table */}
       <div className="card" style={{ marginTop: '2rem' }}>
         <div className="card-header">
-          <div>
-            <h2>Academic Performance Summary</h2>
-            <p className="text-muted" style={{ fontSize: '0.85rem' }}>
-              Aggregated results and automated grading per registered student
-            </p>
-          </div>
+          <h2>Student Performance Summary</h2>
           <Link to="/students" className="btn btn-outline btn-sm">
             View All Students
           </Link>
         </div>
 
         <div className="card-body">
-          {summaryStudents.length > 0 ? (
+          {studentSummaries.length > 0 ? (
             <div className="table-wrap">
               <table>
                 <thead>
                   <tr>
                     <th>Student ID</th>
                     <th>Full Name</th>
-                    <th>Class / Department</th>
+                    <th>Class / Dept</th>
                     <th>Average Score</th>
                     <th>Grade</th>
-                    <th>Quick Action</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {summaryStudents.map((student) => {
-                    const avg = student.averagePercentage != null ? student.averagePercentage : student.avg;
-                    const grade = student.grade || 'N/A';
-                    return (
-                      <tr key={student.id}>
-                        <td>
-                          <span className="badge badge-neutral">
-                            {student.studentId}
-                          </span>
-                        </td>
-                        <td>
-                          <Link to={`/students/${student.id}`} className="student-name-link">
-                            <strong>{student.fullName || student.name}</strong>
-                          </Link>
-                        </td>
-                        <td>{student.className || '—'}</td>
-                        <td>
-                          <strong>{avg != null ? `${Number(avg).toFixed(1)}%` : 'No Records'}</strong>
-                        </td>
-                        <td>
-                          <span className={getGradeBadgeClass(grade)}>{grade}</span>
-                        </td>
-                        <td>
-                          <Link to={`/students/${student.id}`} className="btn btn-outline btn-sm">
-                            View Profile
-                          </Link>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {studentSummaries.map((s) => (
+                    <tr key={s.id}>
+                      <td>
+                        <span className="badge badge-neutral">{s.studentId}</span>
+                      </td>
+                      <td>
+                        <Link to={`/students/${s.id}`} className="student-name-link">
+                          <strong>{s.fullName}</strong>
+                        </Link>
+                      </td>
+                      <td>{s.className || '—'}</td>
+                      <td>
+                        {s.averagePercentage != null ? `${Number(s.averagePercentage).toFixed(1)}%` : 'No Marks'}
+                      </td>
+                      <td>{getGradeBadge(s.grade)}</td>
+                      <td>
+                        <Link to={`/students/${s.id}`} className="btn btn-outline btn-sm">
+                          View
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
           ) : (
             <div className="empty-state">
-              <p>No students found. Register your first student to see academic summaries.</p>
-              <Link to="/students/new" className="btn btn-primary" style={{ marginTop: '0.5rem' }}>
-                Register Student
+              <p>No students found. Register your first student to get started.</p>
+              <Link to="/students/new" className="btn btn-primary" style={{ marginTop: '0.75rem' }}>
+                <FaPlus /> Add Student
               </Link>
             </div>
           )}

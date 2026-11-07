@@ -24,11 +24,9 @@ export default function StudentProfile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Modal states
-  const [isMarksModalOpen, setIsMarksModalOpen] = useState(false);
+  // Modal and dialog states
+  const [showMarksModal, setShowMarksModal] = useState(false);
   const [editingMark, setEditingMark] = useState(null);
-
-  // Confirm dialog states
   const [confirmDeleteStudent, setConfirmDeleteStudent] = useState(false);
   const [markToDelete, setMarkToDelete] = useState(null);
 
@@ -39,7 +37,7 @@ export default function StudentProfile() {
       const res = await fetchStudent(id);
       setStudent(res.data);
     } catch (err) {
-      setError(err.response?.data?.error || 'Student not found or server error');
+      setError('Student not found or server error');
     } finally {
       setLoading(false);
     }
@@ -52,10 +50,10 @@ export default function StudentProfile() {
   const handleDeleteStudent = async () => {
     try {
       await deleteStudent(id);
-      toast.success('Student profile deleted successfully');
+      toast.success('Student profile deleted');
       navigate('/students');
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to delete student');
+      toast.error('Failed to delete student');
     } finally {
       setConfirmDeleteStudent(false);
     }
@@ -65,10 +63,10 @@ export default function StudentProfile() {
     if (!markToDelete) return;
     try {
       await deleteMark(markToDelete.id);
-      toast.success(`Marks for ${markToDelete.subject} deleted`);
+      toast.success(`Marks for "${markToDelete.subject}" deleted`);
       loadStudent();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to delete mark record');
+      toast.error('Failed to delete mark record');
     } finally {
       setMarkToDelete(null);
     }
@@ -100,13 +98,14 @@ export default function StudentProfile() {
   };
 
   if (loading) return <div className="loading">Loading student profile...</div>;
+
   if (error || !student) {
     return (
       <div className="empty-state">
         <h3>Student Not Found</h3>
-        <p>{error || 'The requested student record does not exist.'}</p>
+        <p>{error}</p>
         <Link to="/students" className="btn btn-primary" style={{ marginTop: '1rem' }}>
-          Back to Student List
+          Back to Students
         </Link>
       </div>
     );
@@ -119,31 +118,31 @@ export default function StudentProfile() {
 
   return (
     <div>
-      <div style={{ marginBottom: '1.25rem' }}>
+      <div style={{ marginBottom: '1rem' }}>
         <Link to="/students" className="btn btn-outline btn-sm">
           <FaArrowLeft /> Back to Students
         </Link>
       </div>
 
       {/* Student Details Card */}
-      <div className="card" style={{ marginBottom: '2rem' }}>
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
         <div className="card-header">
           <div>
             <h2>{student.fullName}</h2>
-            <span className="badge badge-b" style={{ marginTop: '0.25rem' }}>
+            <span className="badge badge-neutral" style={{ marginTop: '0.25rem' }}>
               ID: {student.studentId}
             </span>
           </div>
           <div className="action-buttons">
             <Link to={`/students/edit/${student.id}`} className="btn btn-outline btn-sm">
-              <FaEdit /> Edit Details
+              <FaEdit /> Edit
             </Link>
             <button
               type="button"
               className="btn btn-danger btn-sm"
               onClick={() => setConfirmDeleteStudent(true)}
             >
-              <FaTrash /> Delete Student
+              <FaTrash /> Delete
             </button>
           </div>
         </div>
@@ -155,12 +154,12 @@ export default function StudentProfile() {
               <span>{student.studentId}</span>
             </div>
             <div className="detail-item">
-              <label><FaBook /> Class / Department</label>
+              <label><FaBook /> Class / Dept</label>
               <span>{student.className || 'Not Assigned'}</span>
             </div>
             <div className="detail-item">
               <label><FaEnvelope /> Email Address</label>
-              <span>{student.email || '—'}</span>
+              <span>{student.email}</span>
             </div>
             <div className="detail-item">
               <label><FaPhone /> Phone Number</label>
@@ -170,10 +169,6 @@ export default function StudentProfile() {
               <label><FaCalendarAlt /> Date of Birth</label>
               <span>{student.dateOfBirth || '—'}</span>
             </div>
-            <div className="detail-item">
-              <label><FaCalendarAlt /> Enrollment Date</label>
-              <span>{student.enrollmentDate || '—'}</span>
-            </div>
           </div>
         </div>
       </div>
@@ -182,17 +177,14 @@ export default function StudentProfile() {
       <div className="card">
         <div className="card-header">
           <div>
-            <h2>Academic Examination Records</h2>
-            <p className="text-muted" style={{ fontSize: '0.85rem' }}>
-              Subject-wise scores, calculations, and automated grade evaluations
-            </p>
+            <h2>Examination Marks ({marks.length})</h2>
           </div>
           <button
             type="button"
             className="btn btn-primary btn-sm"
             onClick={() => {
               setEditingMark(null);
-              setIsMarksModalOpen(true);
+              setShowMarksModal(true);
             }}
           >
             <FaPlus /> Add Marks
@@ -210,7 +202,7 @@ export default function StudentProfile() {
                       <th>Exam Type</th>
                       <th>Marks Obtained</th>
                       <th>Total Marks</th>
-                      <th>Percentage & Grade</th>
+                      <th>Grade</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
@@ -221,7 +213,7 @@ export default function StudentProfile() {
                         <tr key={m.id}>
                           <td><strong>{m.subject}</strong></td>
                           <td>
-                            <span className="badge badge-b">{m.examType || 'General'}</span>
+                            <span className="badge badge-neutral">{m.examType}</span>
                           </td>
                           <td>{m.marks}</td>
                           <td>{m.totalMarks}</td>
@@ -234,7 +226,7 @@ export default function StudentProfile() {
                                 title="Edit Mark"
                                 onClick={() => {
                                   setEditingMark(m);
-                                  setIsMarksModalOpen(true);
+                                  setShowMarksModal(true);
                                 }}
                               >
                                 <FaEdit />
@@ -256,18 +248,14 @@ export default function StudentProfile() {
                 </table>
               </div>
 
-              {/* Academic Performance Summary */}
+              {/* Total & Cumulative Summary */}
               <div className="marks-summary-banner">
-                <div className="summary-stat">
-                  <span className="label">Subjects Recorded</span>
-                  <span className="value">{marks.length}</span>
-                </div>
                 <div className="summary-stat">
                   <span className="label">Total Score</span>
                   <span className="value">{totalObtained} / {totalMax}</span>
                 </div>
                 <div className="summary-stat">
-                  <span className="label">Cumulative Percentage</span>
+                  <span className="label">Overall Percentage</span>
                   <span className="value">{overallPercentage.toFixed(1)}%</span>
                 </div>
                 <div className="summary-stat">
@@ -278,14 +266,14 @@ export default function StudentProfile() {
             </>
           ) : (
             <div className="empty-state">
-              <p>No examination marks have been entered for this student yet.</p>
+              <p>No marks entered yet for this student.</p>
               <button
                 type="button"
                 className="btn btn-primary"
                 style={{ marginTop: '0.75rem' }}
                 onClick={() => {
                   setEditingMark(null);
-                  setIsMarksModalOpen(true);
+                  setShowMarksModal(true);
                 }}
               >
                 <FaPlus /> Add First Mark Entry
@@ -295,32 +283,32 @@ export default function StudentProfile() {
         </div>
       </div>
 
-      {/* Marks Form Modal */}
-      {isMarksModalOpen && (
+      {/* Add / Edit Marks Modal */}
+      {showMarksModal && (
         <MarksForm
           studentId={student.id}
           editingMark={editingMark}
-          onClose={() => setIsMarksModalOpen(false)}
+          onClose={() => setShowMarksModal(false)}
           onSaved={loadStudent}
         />
       )}
 
-      {/* Confirm Delete Student Dialog */}
+      {/* Delete Student Confirmation Dialog */}
       <ConfirmDialog
         isOpen={confirmDeleteStudent}
-        title="Delete Student Record"
-        message={`Are you sure you want to permanently delete "${student.fullName}" (ID: ${student.studentId})? All academic and examination records will also be removed.`}
-        confirmText="Yes, Delete Student"
+        title="Delete Student"
+        message={`Are you sure you want to delete "${student.fullName}"? All examination records will also be deleted.`}
+        confirmText="Delete Student"
         onConfirm={handleDeleteStudent}
         onCancel={() => setConfirmDeleteStudent(false)}
       />
 
-      {/* Confirm Delete Mark Dialog */}
+      {/* Delete Mark Confirmation Dialog */}
       <ConfirmDialog
         isOpen={Boolean(markToDelete)}
         title="Delete Examination Mark"
-        message={`Are you sure you want to delete the examination entry for "${markToDelete?.subject}" (${markToDelete?.examType})?`}
-        confirmText="Delete Mark"
+        message={`Delete mark record for "${markToDelete?.subject}"?`}
+        confirmText="Delete"
         onConfirm={handleDeleteMark}
         onCancel={() => setMarkToDelete(null)}
       />

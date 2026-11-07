@@ -1,16 +1,13 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { FaGraduationCap, FaChartBar, FaUsers, FaUserPlus, FaSignOutAlt, FaUserShield } from 'react-icons/fa';
-import { useAuth } from '../../context/AuthContext';
+import { FaGraduationCap, FaChartBar, FaUsers, FaUserPlus } from 'react-icons/fa';
 
 export default function Sidebar() {
-  const { user, logout } = useAuth();
-
   return (
     <aside className="sidebar">
       <div className="brand">
         <FaGraduationCap size={28} />
-        <span>Academic Manager</span>
+        <span>Student Manager</span>
       </div>
 
       <nav>
@@ -27,26 +24,6 @@ export default function Sidebar() {
           <span>Add Student</span>
         </NavLink>
       </nav>
-
-      {user && (
-        <div className="sidebar-footer">
-          <div className="user-profile-widget">
-            <div className="user-avatar">
-              <FaUserShield />
-            </div>
-            <div className="user-info">
-              <span className="user-name">{user.fullName || user.username}</span>
-              <span className="user-role">
-                {user.role === 'ROLE_ADMIN' ? 'Administrator' : 'Teacher'}
-              </span>
-            </div>
-          </div>
-          <button type="button" className="sidebar-logout-btn" onClick={logout} title="Sign Out">
-            <FaSignOutAlt />
-            <span>Sign Out</span>
-          </button>
-        </div>
-      )}
     </aside>
   );
 }

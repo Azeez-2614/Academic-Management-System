@@ -4,7 +4,6 @@ import com.studentmanager.entity.Student;
 import com.studentmanager.service.StudentService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -26,22 +25,8 @@ public class StudentController {
     }
 
     @GetMapping
-    public ResponseEntity<Page<Student>> getStudents(
-            @RequestParam(required = false) String search,
-            @RequestParam(required = false) String className,
-            @RequestParam(required = false) String performance,
-            @RequestParam(required = false, defaultValue = "name") String sortBy,
-            @RequestParam(required = false, defaultValue = "asc") String sortDir,
-            @RequestParam(required = false, defaultValue = "0") int page,
-            @RequestParam(required = false, defaultValue = "10") int size) {
-        Page<Student> pageResult = studentService.getFilteredAndSortedStudents(
-                search, className, performance, sortBy, sortDir, page, size);
-        return ResponseEntity.ok(pageResult);
-    }
-
-    @GetMapping("/classes")
-    public ResponseEntity<List<String>> getClasses() {
-        return ResponseEntity.ok(studentService.getAllClassNames());
+    public ResponseEntity<List<Student>> getAllStudents(@RequestParam(required = false) String search) {
+        return ResponseEntity.ok(studentService.getAllStudents(search));
     }
 
     @GetMapping("/{id}")
@@ -50,25 +35,45 @@ public class StudentController {
     }
 
     @PostMapping
-    public ResponseEntity<Student> createStudent(@Valid @RequestBody Student student) {
-        Student created = studentService.createStudent(student);
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    public ResponseEntity<?> createStudent(@Valid @RequestBody Student student) {
+        try {
+            Student created = studentService.createStudent(student);
+            return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        } catch (IllegalArgumentException ex) {
+            Map<String, String> error = new HashMap<>();
+            error.put("message", ex.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        }
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Student> updateStudent(
-            @PathVariable Long id,
-            @Valid @RequestBody Student student) {
-        Student updated = studentService.updateStudent(id, student);
-        return ResponseEntity.ok(updated);
+    public ResponseEntity<?> updateStudent(@PathVariable Long id, @Valid @RequestBody Student student) {
+        try {
+            Student updated = studentService.updateStudent(id, student);
+            return ResponseEntity.ok(updated);
+        } catch (IllegalArgumentException ex) {
+            Map<String, String> error = new HashMap<>();
+            error.put("message", ex.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        } catch (RuntimeException ex) {
+            Map<String, String> error = new HashMap<>();
+            error.put("message", ex.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+        }
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, String>> deleteStudent(@PathVariable Long id) {
-        studentService.deleteStudent(id);
-        Map<String, String> response = new HashMap<>();
-        response.put("message", "Student and associated examination records deleted successfully");
-        return ResponseEntity.ok(response);
+        try {
+            studentService.deleteStudent(id);
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Student and associated marks deleted successfully");
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException ex) {
+            Map<String, String> error = new HashMap<>();
+            error.put("message", ex.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+        }
     }
 
 }

@@ -5,24 +5,24 @@ import { addMark, updateMark } from '../../api/api';
 
 const DEFAULT_FORM = {
   subject: '',
+  examType: 'Mid-Term',
   marks: '',
   totalMarks: '100',
-  examType: 'Mid-Term',
 };
 
 export default function MarksForm({ studentId, editingMark, onClose, onSaved }) {
   const isEditing = Boolean(editingMark);
   const [form, setForm] = useState(DEFAULT_FORM);
-  const [errors, setErrors] = useState({});
+  const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (editingMark) {
       setForm({
         subject: editingMark.subject || '',
+        examType: editingMark.examType || 'Mid-Term',
         marks: editingMark.marks != null ? String(editingMark.marks) : '',
         totalMarks: editingMark.totalMarks != null ? String(editingMark.totalMarks) : '100',
-        examType: editingMark.examType || 'Mid-Term',
       });
     } else {
       setForm(DEFAULT_FORM);
@@ -32,87 +32,75 @@ export default function MarksForm({ studentId, editingMark, onClose, onSaved }) 
   const marksNum = parseFloat(form.marks);
   const totalNum = parseFloat(form.totalMarks);
 
-  // Live calculation of percentage and grade
-  const livePct =
+  // Automatic percentage calculation
+  const calculatedPct =
     !isNaN(marksNum) && !isNaN(totalNum) && totalNum > 0 && marksNum >= 0 && marksNum <= totalNum
       ? Math.round((marksNum / totalNum) * 10000) / 100
       : null;
 
-  const getLiveGrade = (pct) => {
+  // Automatic grade calculation
+  const calculateGrade = (pct) => {
     if (pct == null) return null;
-    if (pct >= 90.0) return 'A+';
-    if (pct >= 80.0) return 'A';
-    if (pct >= 70.0) return 'B+';
-    if (pct >= 60.0) return 'B';
-    if (pct >= 50.0) return 'C';
-    if (pct >= 40.0) return 'D';
+    if (pct >= 90) return 'A+';
+    if (pct >= 80) return 'A';
+    if (pct >= 70) return 'B+';
+    if (pct >= 60) return 'B';
+    if (pct >= 50) return 'C';
+    if (pct >= 40) return 'D';
     return 'F';
   };
 
-  const liveGrade = getLiveGrade(livePct);
-
-  const validate = () => {
-    const errs = {};
-    if (!form.subject.trim()) {
-      errs.subject = 'Subject name is required';
-    } else if (form.subject.trim().length < 2 || form.subject.trim().length > 100) {
-      errs.subject = 'Subject name must be between 2 and 100 characters';
-    }
-
-    if (form.marks === '' || isNaN(marksNum)) {
-      errs.marks = 'Marks obtained is required and must be a valid number';
-    } else if (marksNum < 0) {
-      errs.marks = 'Marks obtained cannot be negative';
-    }
-
-    if (form.totalMarks === '' || isNaN(totalNum)) {
-      errs.totalMarks = 'Total marks is required';
-    } else if (totalNum <= 0) {
-      errs.totalMarks = 'Total marks must be strictly greater than 0';
-    } else if (!isNaN(marksNum) && marksNum > totalNum) {
-      errs.marks = `Marks obtained (${marksNum}) cannot exceed total maximum marks (${totalNum})`;
-    }
-
-    if (!form.examType || !form.examType.trim()) {
-      errs.examType = 'Exam type is required';
-    }
-
-    setErrors(errs);
-    return Object.keys(errs).length === 0;
-  };
+  const calculatedGrade = calculateGrade(calculatedPct);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: undefined }));
-    }
+    setForm({ ...form, [e.target.name]: e.target.value });
+    setError('');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validate()) return;
 
-    const payload = {
-      subject: form.subject.trim(),
-      marks: parseFloat(form.marks),
-      totalMarks: parseFloat(form.totalMarks),
-      examType: form.examType.trim(),
-    };
+    if (!form.subject.trim()) {
+      setError('Subject name is required.');
+      return;
+    }
+
+    if (isNaN(marksNum) || marksNum < 0) {
+      setError('Obtained marks must be a valid positive number.');
+      return;
+    }
+
+    if (isNaN(totalNum) || totalNum <= 0) {
+      setError('Total marks must be greater than zero.');
+      return;
+    }
+
+    if (marksNum > totalNum) {
+      setError(`Obtained marks (${marksNum}) cannot exceed total marks (${totalNum}).`);
+      return;
+    }
 
     setSaving(true);
     try {
+      const payload = {
+        subject: form.subject.trim(),
+        examType: form.examType,
+        marks: marksNum,
+        totalMarks: totalNum,
+      };
+
       if (isEditing) {
         await updateMark(editingMark.id, payload);
-        toast.success(`Marks for "${payload.subject}" updated successfully`);
+        toast.success(`Marks for "${payload.subject}" updated!`);
       } else {
         await addMark(studentId, payload);
-        toast.success(`Marks for "${payload.subject}" added successfully`);
+        toast.success(`Marks for "${payload.subject}" added!`);
       }
       onSaved();
       onClose();
     } catch (err) {
-      const msg = err.userMessage || err.response?.data?.message || 'Failed to save examination marks';
+      const msg = err.response?.data?.message || 'Failed to save examination marks.';
+      setError(msg);
       toast.error(msg);
     } finally {
       setSaving(false);
@@ -123,12 +111,15 @@ export default function MarksForm({ studentId, editingMark, onClose, onSaved }) 
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>{isEditing ? 'Edit Examination Marks' : 'Add Examination Marks'}</h3>
-          <button type="button" className="btn-icon" onClick={onClose} aria-label="Close" disabled={saving}>
+          <h3>{isEditing ? 'Edit Marks' : 'Add Examination Marks'}</h3>
+          <button type="button" className="btn-icon" onClick={onClose} disabled={saving}>
             <FaTimes />
           </button>
         </div>
+
         <div className="modal-body">
+          {error && <div className="error-banner">{error}</div>}
+
           <form onSubmit={handleSubmit}>
             <div className="form-grid single-column">
               <div className="form-group">
@@ -138,15 +129,14 @@ export default function MarksForm({ studentId, editingMark, onClose, onSaved }) 
                   name="subject"
                   value={form.subject}
                   onChange={handleChange}
-                  placeholder="e.g. Mathematics, Physics, Chemistry"
-                  className={errors.subject ? 'input-error' : ''}
+                  placeholder="e.g. Mathematics"
+                  required
                   disabled={saving}
                 />
-                {errors.subject && <span className="field-error">{errors.subject}</span>}
               </div>
 
               <div className="form-group">
-                <label htmlFor="examType">Exam Type *</label>
+                <label htmlFor="examType">Examination Type *</label>
                 <select
                   id="examType"
                   name="examType"
@@ -158,54 +148,48 @@ export default function MarksForm({ studentId, editingMark, onClose, onSaved }) 
                   <option value="Final">Final</option>
                   <option value="Unit Test">Unit Test</option>
                   <option value="Assignment">Assignment</option>
-                  <option value="Practical">Practical</option>
                 </select>
-                {errors.examType && <span className="field-error">{errors.examType}</span>}
               </div>
 
               <div className="form-group">
-                <label htmlFor="marks">Marks Obtained *</label>
+                <label htmlFor="marks">Obtained Marks *</label>
                 <input
                   id="marks"
                   name="marks"
                   type="number"
-                  step="0.01"
+                  step="0.5"
                   min="0"
                   value={form.marks}
                   onChange={handleChange}
-                  placeholder="e.g. 88.5"
-                  className={errors.marks ? 'input-error' : ''}
+                  placeholder="e.g. 85"
+                  required
                   disabled={saving}
                 />
-                {errors.marks && <span className="field-error">{errors.marks}</span>}
               </div>
 
               <div className="form-group">
-                <label htmlFor="totalMarks">Maximum Total Marks *</label>
+                <label htmlFor="totalMarks">Total / Maximum Marks *</label>
                 <input
                   id="totalMarks"
                   name="totalMarks"
                   type="number"
-                  step="0.01"
-                  min="0.01"
+                  step="0.5"
+                  min="1"
                   value={form.totalMarks}
                   onChange={handleChange}
                   placeholder="e.g. 100"
-                  className={errors.totalMarks ? 'input-error' : ''}
+                  required
                   disabled={saving}
                 />
-                {errors.totalMarks && <span className="field-error">{errors.totalMarks}</span>}
               </div>
 
-              {/* Dynamic Live Calculation Preview */}
-              {livePct != null && (
+              {/* Automatic Live Calculation Display */}
+              {calculatedPct != null && (
                 <div className="live-grading-preview">
                   <FaCalculator />
                   <span>
-                    Calculated Result: <strong>{livePct.toFixed(2)}%</strong> — Grade:{' '}
-                    <span className={`badge ${liveGrade === 'A+' || liveGrade === 'A' ? 'badge-a' : liveGrade.startsWith('B') ? 'badge-b' : liveGrade === 'F' ? 'badge-f' : 'badge-c'}`}>
-                      {liveGrade}
-                    </span>
+                    Percentage: <strong>{calculatedPct.toFixed(1)}%</strong> — Grade:{' '}
+                    <strong>{calculatedGrade}</strong>
                   </span>
                 </div>
               )}
@@ -215,7 +199,7 @@ export default function MarksForm({ studentId, editingMark, onClose, onSaved }) 
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={saving}>
-                  {saving ? 'Saving Marks...' : isEditing ? 'Update Marks' : 'Save Examination Record'}
+                  {saving ? 'Saving...' : isEditing ? 'Update Marks' : 'Save Marks'}
                 </button>
               </div>
             </div>

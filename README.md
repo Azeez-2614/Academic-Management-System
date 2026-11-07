@@ -1,231 +1,200 @@
-# 🎓 Academic Management System (Teacher–Student Management)
+# 🎓 Academic Management System (Teacher–Student Manager)
 
-[![CI/CD Pipeline](https://github.com/your-username/academic-management-system/actions/workflows/ci.yml/badge.svg)](https://github.com/your-username/academic-management-system/actions)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.5-brightgreen.svg)](https://spring.io/projects/spring-boot)
-[![React](https://img.shields.io/badge/React-18.3-blue.svg)](https://reactjs.org/)
-[![MySQL](https://img.shields.io/badge/MySQL-8.0-orange.svg)](https://www.mysql.com/)
+A clean, beginner-to-intermediate full-stack web application built with **React.js (Vite)**, **Java Spring Boot**, and **MySQL**.
 
-A full-stack, enterprise-grade **Teacher–Student Academic Management System** built with **Spring Boot 3 (Java 17)**, **React 18 (Vite)**, and **MySQL 8.0**. Designed to demonstrate production-quality software engineering: stateless JWT authentication, role-based access control (RBAC), database indexing and aggregation queries, Jakarta Bean Validation, structured exception handling, and automated unit/integration testing.
+This project provides a clean CRUD (Create, Read, Update, Delete) management system for teachers to manage student information and examination marks.
 
 ---
 
-## 🏛️ System Architecture
+## 🏛️ Project Architecture
+
+The application uses a standard, straightforward **layered architecture**:
 
 ```
-                                  +-----------------------------+
-                                  |   React 18 Single Page App  |
-                                  | (Vite, Axios, React Router) |
-                                  +--------------+--------------+
-                                                 |
-                                     HTTP / REST (JWT Bearer)
-                                                 |
-                                  +--------------v--------------+
-                                  | Spring Security & JWT Filter|
-                                  +--------------+--------------+
-                                                 |
-                   +-----------------------------+-----------------------------+
-                   |                             |                             |
-       +-----------v-----------+     +-----------v-----------+     +-----------v-----------+
-       |   StudentController   |     |    MarkController     |     |  DashboardController  |
-       +-----------+-----------+     +-----------+-----------+     +-----------+-----------+
-                   |                             |                             |
-       +-----------v-----------+     +-----------v-----------+                 |
-       |    StudentService     |     |      MarkService      |                 |
-       +-----------+-----------+     +-----------+-----------+                 |
-                   |                             |                             |
-       +-----------v-----------+     +-----------v-----------+                 |
-       |   StudentRepository   |     |    MarkRepository     |<----------------+
-       +-----------+-----------+     +-----------+-----------+
-                   |                             |
-                   +--------------+--------------+
-                                  | Spring Data JPA / Hibernate
-                                  v
-                   +-----------------------------+
-                   |       MySQL 8.0 Database    |
-                   |  (Tables: users, students,  |
-                   |         marks)              |
-                   +-----------------------------+
+                    +--------------------------------+
+                    |   Frontend (React + Vite)      |
+                    | (Dashboard, Students, Marks)   |
+                    +---------------+----------------+
+                                    | Axios (HTTP / REST)
+                                    v
+                    +--------------------------------+
+                    |   Controller Layer (REST)      |
+                    | (Student, Mark, Dashboard)     |
+                    +---------------+----------------+
+                                    |
+                                    v
+                    +--------------------------------+
+                    |   Service Layer (Logic)        |
+                    | (Validations, Calculations)    |
+                    +---------------+----------------+
+                                    |
+                                    v
+                    +--------------------------------+
+                    |   Repository Layer (JPA)       |
+                    | (Database Queries)             |
+                    +---------------+----------------+
+                                    |
+                                    v
+                    +--------------------------------+
+                    |   MySQL Database               |
+                    | (students and marks tables)    |
+                    +--------------------------------+
 ```
 
 ---
 
-## 📋 Technical Highlights & Implementation Standards
+## 🛠️ Technology Stack
 
-### 1. Security & Authentication (Spring Security + JWT)
-- **Stateless REST Security**: Session state is disabled (`SessionCreationPolicy.STATELESS`).
-- **Cryptographic Password Hashing**: Passwords are saved with `BCryptPasswordEncoder`.
-- **HMAC-SHA256 JWT**: Signed tokens issued at `/api/auth/login` containing roles and expiration timestamps.
-- **RBAC (Role-Based Access Control)**: Endpoints restricted to `ROLE_TEACHER` and `ROLE_ADMIN`.
-- **Pre-configured Demo Accounts**:
-  - Teacher: `teacher` / `password123` (`ROLE_TEACHER`)
-  - Admin: `admin` / `admin123` (`ROLE_ADMIN`)
+### Frontend
+- **React.js 18**: Functional components with `useState` and `useEffect`.
+- **Vite**: Fast frontend build tool and development server.
+- **Axios**: HTTP client for REST API communication.
+- **React Router v6**: Single-page navigation between views.
+- **React Icons & React Toastify**: Icons and user-friendly success/error notifications.
+- **CSS3**: Custom modern styling with a responsive sidebar and cards layout.
 
-### 2. High-Performance Dashboard Aggregations (No N+1 Queries)
-- Database-level aggregation functions (`COUNT`, `AVG`, `MAX`, `MIN`) and JPQL `GROUP BY` queries for subject averages.
-- Eager relationships loaded via `JOIN FETCH` queries to prevent the classic Hibernate N+1 select problem.
-- Real-time grade distribution breakdown across 7 academic tiers.
+### Backend
+- **Java 17**: Core object-oriented backend programming language.
+- **Spring Boot 3**: Framework for REST APIs and dependency injection.
+- **Spring Data JPA & Hibernate**: Object-relational mapping and database access.
+- **MySQL Driver**: Connects Spring Boot to the MySQL database.
+- **Jakarta Validation**: Form and entity validation (`@NotBlank`, `@Email`, `@NotNull`, `@DecimalMin`).
+- **Lombok**: Reduces boilerplate getters, setters, and constructors (`@Data`, `@NoArgsConstructor`, `@AllArgsConstructor`).
 
-### 3. Institutional Grading & Precision Bounds
-Grading follows strict institutional policy boundaries with double-precision floating point validation:
-
-| Percentage Range | Grade | Description |
-|---|---|---|
-| **90.00% – 100.00%** | **A+** | Outstanding Distinction |
-| **80.00% – 89.99%** | **A** | Excellent |
-| **70.00% – 79.99%** | **B+** | Very Good |
-| **60.00% – 69.99%** | **B** | Good |
-| **50.00% – 59.99%** | **C** | Satisfactory |
-| **40.00% – 49.99%** | **D** | Minimum Passing Grade |
-| **Below 40.00%** | **F** | Failing / Needs Remediation |
-
-*Boundary tests (e.g., `89.99% -> A` vs `90.00% -> A+`) are covered in both JUnit 5 and Vitest suites.*
-
-### 4. Robust Data Validation & Exception Handling
-- **Jakarta Bean Validation**: `@NotBlank`, `@Size`, `@Email`, `@Pattern`, `@DecimalMin`, `@Past`, `@PastOrPresent`.
-- **Duplicate Prevention**: Rejects duplicate student IDs, emails, and duplicate exam entries for the same subject/exam type.
-- **Unified Global Error Handler**: `@RestControllerAdvice` returning standardized RFC-7807 compliant JSON responses:
-  ```json
-  {
-    "status": 400,
-    "message": "Validation failed for input data",
-    "timestamp": "2026-11-06T15:15:00",
-    "path": "/api/students",
-    "errors": [
-      "fullName: Full Name must be between 2 and 100 characters",
-      "email: Please provide a valid email address"
-    ]
-  }
-  ```
-
-### 5. Frontend Resilience & Usability
-- **Axios Interceptors**: Automatically injects JWT Bearer header; captures 401 unauthenticated events to cleanly redirect to login.
-- **Configurable Mock Mode**: Controlled strictly via `VITE_USE_MOCK=true`. When set to false, requests hit the live Spring Boot API; errors are reported truthfully via notifications rather than silently masking failures.
-- **Backend Pagination**: Fast pagination (`Page<Student>`) with page number navigation and boundary disablement.
+### Database
+- **MySQL 8.0**: Relational database with two primary tables: `students` and `marks` linked by a One-to-Many foreign key relationship with cascade deletion.
 
 ---
 
-## 🚀 Quick Start with Docker Compose
+## 🌟 Core Application Features
 
-The fastest way to spin up MySQL, Spring Boot, and React in an isolated environment:
+### 1. Dashboard
+- **Total Students Count**
+- **Average Class Marks (%)**
+- **Highest Student Score**
+- **Lowest Student Score**
+- **Student Performance Summary Table** with quick links to individual profiles.
 
-```bash
-# Clone the repository
-git clone https://github.com/your-username/academic-management-system.git
-cd academic-management-system
+### 2. Student Management (CRUD)
+- **Add Students**: Full Name, Student ID, Email, Phone, Class/Department, Date of Birth.
+- **View Students**: Clean table showing all registered students.
+- **Search Students**: Instant search by Student Name or Student ID.
+- **Edit Students**: Update student contact and academic information.
+- **Delete Students**: Remove student records with a confirmation dialog (also automatically deletes associated marks via database cascade).
 
-# Start MySQL, Backend, and Frontend containers
-docker-compose up --build
-```
-
-- **Frontend Application**: [http://localhost:5173](http://localhost:5173)
-- **Spring Boot API**: [http://localhost:8080/api](http://localhost:8080/api)
-- **MySQL Database**: `localhost:3306`
+### 3. Marks Management (CRUD)
+- **Add Examination Marks**: Subject, Examination Type (Mid-Term, Final, Unit Test, Assignment), Obtained Marks, and Total Marks.
+- **Automatic Percentage Calculation**: Computed dynamically: `(marks / totalMarks) * 100`.
+- **Automatic Grade Calculation**:
+  - $\ge 90\% \rightarrow \mathbf{A+}$
+  - $80\% \text{--} 89.9\% \rightarrow \mathbf{A}$
+  - $70\% \text{--} 79.9\% \rightarrow \mathbf{B+}$
+  - $60\% \text{--} 69.9\% \rightarrow \mathbf{B}$
+  - $50\% \text{--} 59.9\% \rightarrow \mathbf{C}$
+  - $40\% \text{--} 49.9\% \rightarrow \mathbf{D}$
+  - $< 40\% \rightarrow \mathbf{F}$
+- **View, Edit & Delete Marks**: Subject-wise table inside the student's profile page.
 
 ---
 
-## 💻 Manual Local Development Setup
+## 📁 Project Directory Structure
 
-### 1. Prerequisites
-- **Node.js** (v18+) & **npm**
-- **JDK 17+**
-- **MySQL 8.0**
-
-### 2. Configure Environment Variables
-Copy `.env.example` to `.env`:
-```bash
-cp .env.example .env
+```
+student-manager/
+├── backend/
+│   ├── pom.xml
+│   └── src/main/
+│       ├── java/com/studentmanager/
+│       │   ├── StudentManagerApplication.java
+│       │   ├── config/WebConfig.java           # CORS configuration
+│       │   ├── entity/Student.java             # Student database entity
+│       │   ├── entity/Mark.java                # Mark database entity
+│       │   ├── repository/StudentRepository.java
+│       │   ├── repository/MarkRepository.java
+│       │   ├── service/StudentService.java     # Student CRUD & search logic
+│       │   ├── service/MarkService.java        # Marks CRUD & calculations
+│       │   ├── controller/StudentController.java
+│       │   ├── controller/MarkController.java
+│       │   ├── controller/DashboardController.java
+│       │   └── dto/DashboardResponse.java      # Dashboard summary data
+│       └── resources/
+│           ├── application.properties          # Database credentials & setup
+│           └── data.sql                        # Sample seed students & marks
+│
+└── frontend/
+    ├── package.json
+    ├── vite.config.js                          # Vite configuration & /api proxy
+    ├── index.html
+    └── src/
+        ├── main.jsx                            # React entry point
+        ├── App.jsx                             # Application routing
+        ├── index.css                           # Application styling
+        ├── api/api.js                          # Centralized Axios API functions
+        └── components/
+            ├── layout/
+            │   ├── Layout.jsx                  # Main page layout wrapper
+            │   └── Sidebar.jsx                 # Sidebar navigation menu
+            ├── dashboard/
+            │   └── Dashboard.jsx               # Dashboard statistics view
+            ├── students/
+            │   ├── StudentList.jsx             # Searchable student directory table
+            │   ├── StudentForm.jsx             # Add & Edit student form
+            │   └── StudentProfile.jsx          # Student profile & marks list
+            ├── marks/
+            │   └── MarksForm.jsx               # Modal form to add/edit marks
+            └── common/
+                └── ConfirmDialog.jsx           # Reusable delete confirmation modal
 ```
 
-### 3. Run the Backend (Spring Boot)
+---
+
+## 🚀 How to Run the Application
+
+### 1. Database Setup (MySQL)
+1. Ensure your MySQL server is running on port `3306`.
+2. Create the database:
+   ```sql
+   CREATE DATABASE IF NOT EXISTS student_manager_db;
+   ```
+3. Update `backend/src/main/resources/application.properties` with your MySQL username and password (default is `root` / `root`).
+
+### 2. Run the Spring Boot Backend
 ```bash
 cd backend
-mvn clean spring-boot:run
+mvn spring-boot:run
 ```
+The backend API starts on **http://localhost:8080**.
 
-### 4. Run the Frontend (React / Vite)
+### 3. Run the React Frontend
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-Open [http://localhost:5173](http://localhost:5173) and sign in using:
-- **Username**: `teacher`
-- **Password**: `password123`
+Open **http://localhost:5173** in your browser to use the application!
 
 ---
 
-## 🧪 Testing Suites
+## 📡 REST API Reference
 
-### Backend Unit & Integration Tests (JUnit 5, Mockito, MockMvc)
-```bash
-cd backend
-mvn test
-```
-- `StudentServiceTest`: Verifies student creation, unique ID/email enforcement, and average calculation.
-- `MarkServiceTest`: Tests negative marks rejection, obtained > total boundary protection, and duplicate exam prevention.
-- `MarkEntityTest`: Tests all 16 institutional grading boundaries.
-- `StudentControllerTest`: Tests MockMvc security protection (401 unauthenticated vs 200 authenticated) and Bean Validation 400 Bad Request responses.
-
-### Frontend Unit & Component Tests (Vitest, React Testing Library)
-```bash
-cd frontend
-npm test
-```
-- `grading.test.js`: Verifies precision percentage math and grade assignments.
-- `ConfirmDialog.test.jsx`: Tests confirmation modal accessibility and callbacks.
-- `MarksForm.test.jsx`: Tests real-time grading preview, blank input rejection, and obtained > total mark rejection.
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/dashboard` | Get total students, average score, and top/bottom scorers |
+| `GET` | `/api/students` | Get all students (supports optional `?search=query`) |
+| `GET` | `/api/students/{id}` | Get a single student by ID with their marks |
+| `POST` | `/api/students` | Register a new student |
+| `PUT` | `/api/students/{id}` | Update student details |
+| `DELETE` | `/api/students/{id}` | Delete student and their marks |
+| `GET` | `/api/students/{studentId}/marks` | Get all marks for a student |
+| `POST` | `/api/students/{studentId}/marks` | Add examination marks for a student |
+| `PUT` | `/api/marks/{markId}` | Update an examination mark record |
+| `DELETE` | `/api/marks/{markId}` | Delete an examination mark record |
 
 ---
 
-## 📡 Complete REST API Reference
+## 💡 How to Explain this Project in an Interview
 
-### Authentication (`/api/auth`)
-| Method | Endpoint | Access | Description |
-|---|---|---|---|
-| `POST` | `/api/auth/login` | Public | Authenticates credentials and returns JWT token |
-| `POST` | `/api/auth/register` | Public | Registers a new teacher account |
-| `GET` | `/api/auth/me` | Authenticated | Returns profile of current user |
-
-### Students (`/api/students`)
-| Method | Endpoint | Access | Description |
-|---|---|---|---|
-| `GET` | `/api/students` | Teacher, Admin | Paginated list with `search`, `className`, `performance`, `sortBy`, `sortDir`, `page`, `size` |
-| `GET` | `/api/students/{id}` | Teacher, Admin | Get student profile and examination records |
-| `POST` | `/api/students` | Teacher, Admin | Register student (validates ID and email uniqueness) |
-| `PUT` | `/api/students/{id}` | Teacher, Admin | Update student information |
-| `DELETE` | `/api/students/{id}` | Teacher, Admin | Cascade deletes student and marks |
-| `GET` | `/api/students/classes`| Teacher, Admin | Returns distinct enrolled class names |
-
-### Marks (`/api/marks` & `/api/students/{id}/marks`)
-| Method | Endpoint | Access | Description |
-|---|---|---|---|
-| `GET` | `/api/students/{studentId}/marks` | Teacher, Admin | Get all examination marks for a student |
-| `POST` | `/api/students/{studentId}/marks` | Teacher, Admin | Record marks (rejects negative or obtained > max) |
-| `PUT` | `/api/marks/{markId}` | Teacher, Admin | Update examination mark record |
-| `DELETE` | `/api/marks/{markId}` | Teacher, Admin | Delete examination entry |
-
-### Dashboard (`/api/dashboard`)
-| Method | Endpoint | Access | Description |
-|---|---|---|---|
-| `GET` | `/api/dashboard` | Teacher, Admin | Aggregate metrics, subject averages, grade counts, top & bottom scorers |
-
----
-
-## 🎯 Technical Interview Discussion Guide
-
-When presenting this project in a technical interview, be prepared to explain:
-
-1. **Why JWT over Stateful Sessions?**
-   Stateless JWT tokens simplify horizontal scaling across multiple backend instances without sticky sessions or centralized Redis session storage.
-2. **How was the N+1 Query Problem resolved?**
-   In `StudentRepository`, the query `@Query("SELECT s FROM Student s LEFT JOIN FETCH s.marks")` fetches students and their marks in a single SQL join rather than executing 1 select for the student table followed by N selects for each student's marks.
-3. **Database Indexing Strategy**:
-   Indexes are placed on frequently searched and filtered columns (`student_id`, `email`, `class_name`, `full_name`) to ensure $O(\log n)$ B-Tree lookups rather than $O(n)$ full table scans.
-4. **Resilience & Fault Transparency**:
-   Rather than silently masking connection failures with fake data, the application returns descriptive error codes (400, 401, 403, 404, 409) that the frontend catches to notify the user truthfully.
-
----
-
-## 📄 License
-This project is licensed under the [MIT License](LICENSE).
+- **Architecture**: *"I used a 4-layer architecture in Spring Boot (Controller, Service, Repository, Entity). The controller handles HTTP requests and validates inputs; the service layer contains business logic like grade calculations; the repository layer talks to MySQL via Spring Data JPA."*
+- **Relationship & Cascade**: *"Student and Mark have a One-to-Many relationship. I used `cascade = CascadeType.ALL` and `orphanRemoval = true` so deleting a student automatically cleans up all associated marks in MySQL."*
+- **Calculated Fields**: *"In Mark entity, percentage and grade are transient methods that compute values on the fly without needing redundant columns in the database."*
+- **Frontend State**: *"In React, I kept state management simple using `useState` for component state and `useEffect` for data fetching via Axios. The UI is component-based, with reusable modals for marks entry and delete confirmations."*
